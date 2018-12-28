@@ -15,7 +15,7 @@ import (
 
 /*
 Structs takes two structs of the same type and finds
-the differences between them. Each string in fields
+the differences between them. Each string in changes
 corresponds to a field whose value differs between
 the structs. Fields with identical values are omitted.
 The format of each string looks like this:
@@ -31,8 +31,8 @@ data structures themselves. Pointers to structs must be
 dereferenced when passing them to Structs. Differences
 between unexported fields will not be detected.
 
-If before or after are not structs or they are structs
-of different types an error will be returned.
+Structs returns an error if before or after are not
+structs or if they are structs of different types.
 
 	type Config struct {
 		Debug   bool
@@ -49,7 +49,7 @@ of different types an error will be returned.
 	fmt.Println(fields[2]) // `Timeout changed from 0 to 30`
 
 */
-func Structs(before, after interface{}) (fields []string, err error) {
+func Structs(before, after interface{}) (changes []string, err error) {
 	return structs("{{.Field}} changed from {{.Before}} to {{.After}}", before, after)
 }
 
@@ -66,8 +66,8 @@ the following pipelines available to it:
 These respectively refer to the changed field's name, its previous
 value, and its new value. Fields may be omitted if desired.
 
-Returns an error under the same conditions as Structs or if the
-supplied format string refers to an unavailable field.
+StructsF returns an error under the same conditions as Structs
+or if the supplied format string refers to an unavailable field.
 
 	type Config struct {
 		Debug   bool
@@ -78,13 +78,13 @@ supplied format string refers to an unavailable field.
 	c1 := Config{}
 	c2 := Config{"0.0.1", true, 30}
 
-	fields, _ := diff.StructsF("{{.Name}}: {{.After}}", c1, c2)
+	fields, _ := diff.StructsF("{{.Field}}: {{.After}}", c1, c2)
 	fmt.Println(fields[0]) // `Debug: true`
 	fmt.Println(fields[1]) // `Version: "0.0.1"`
 	fmt.Println(fields[2]) // `Timeout: 30`
 
 */
-func StructsF(format string, before, after interface{}) (fields []string, err error) {
+func StructsF(format string, before, after interface{}) (changes []string, err error) {
 	return structs(format, before, after)
 }
 
