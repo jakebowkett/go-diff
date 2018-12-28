@@ -16,19 +16,20 @@ import (
 /*
 Structs takes two structs of the same type and finds
 the differences between them. Each string in fields
-corresponds to a field that changed. Unchanged fields
-are omitted. The format of each string looks like this:
+corresponds to a field whose value differs between
+the structs. Fields with identical values are omitted.
+The format of each string looks like this:
 
 	"{{.Field}} changed from {{.Before}} to {{.After}}"
 
 If the field's value is a string it will be quoted in
-the output. Different formats can be achived with StructsF.
+the output. Custom formats can be achived with StructsF.
 
 Structs only iterates over the first level of a struct's
 fields. It is not intended for structs whose fields are
 data structures themselves. Pointers to structs must be
-dereferenced when passing them to Structs. Changes to
-unexported fields will not be detected.
+dereferenced when passing them to Structs. Differences
+between unexported fields will not be detected.
 
 If before or after are not structs or they are structs
 of different types an error will be returned.
@@ -54,11 +55,19 @@ func Structs(before, after interface{}) (fields []string, err error) {
 
 /*
 StructsF works the same as Structs but takes a format string.
-Formatting is styled after the standard libraries text/template
-package. The available fields to render into the string are .Field,
-.Before, and .After. These respectively refer to the changed
-field's name, its previous value, and its new value. Fields may
-be omitted if desired.
+Formatting is styled after the standard library's text/template
+package. The format string is rendered as a template which has
+the following pipelines available to it:
+
+	.Field
+	.Before
+	.After
+
+These respectively refer to the changed field's name, its previous
+value, and its new value. Fields may be omitted if desired.
+
+Returns an error under the same conditions as Structs or if the
+supplied format string refers to an unavailable field.
 
 	type Config struct {
 		Debug   bool
@@ -110,7 +119,7 @@ func structs(format string, before, after interface{}) ([]string, error) {
 			v2 = fmt.Sprintf("%q", v2)
 		}
 
-		t.Execute(&buf, struct {
+		err := t.Execute(&buf, struct {
 			Field  string
 			Before interface{}
 			After  interface{}
@@ -119,6 +128,9 @@ func structs(format string, before, after interface{}) ([]string, error) {
 			Before: v1,
 			After:  v2,
 		})
+		if err != nil {
+			return nil, err
+		}
 
 		fields = append(fields, buf.String())
 		buf.Reset()

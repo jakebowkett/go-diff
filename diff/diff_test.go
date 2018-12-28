@@ -2,18 +2,18 @@ package diff
 
 import "testing"
 
-func TestStructs(t *testing.T) {
+type config struct {
+	Debug   bool
+	Version string
+	Timeout int
+}
+type notConfig struct {
+	Debug   bool
+	Version string
+	Timeout int
+}
 
-	type config struct {
-		Debug   bool
-		Version string
-		Timeout int
-	}
-	type notConfig struct {
-		Debug   bool
-		Version string
-		Timeout int
-	}
+func TestStructs(t *testing.T) {
 
 	cases := []struct {
 		before  interface{}
@@ -99,7 +99,66 @@ func TestStructs(t *testing.T) {
 				c.before, c.after, got, err, c.want, errStr)
 		}
 	}
+}
 
+func TestStructsF(t *testing.T) {
+
+	cases := []struct {
+		before  interface{}
+		after   interface{}
+		format  string
+		want    []string
+		wantErr bool
+	}{
+		// Unavailable field in format string.
+		{
+			config{true, "0.0.0", 30},
+			config{true, "0.0.1", 15},
+			`{{.Field}}: {{.Apple}}`,
+			nil,
+			true,
+		},
+
+		// Correctly formatted strings.
+		{
+			config{true, "0.0.0", 30},
+			config{true, "0.0.1", 15},
+			`{{.Field}}: {{.After}}`,
+			[]string{
+				`Version: "0.0.1"`,
+				`Timeout: 15`,
+			},
+			false,
+		},
+		{
+			config{true, "0.0.0", 30},
+			config{false, "0.0.1", 0},
+			`{{.Before}} --> {{.After}}`,
+			[]string{
+				`true --> false`,
+				`"0.0.0" --> "0.0.1"`,
+				`30 --> 0`,
+			},
+			false,
+		},
+	}
+
+	for _, c := range cases {
+
+		errStr := "nil"
+		if c.wantErr {
+			errStr = "error"
+		}
+
+		got, err := StructsF(c.format, c.before, c.after)
+		if !equal(got, c.want) || err == nil && c.wantErr {
+			t.Errorf(
+				"Structs(%v, %v)\n"+
+					"    return %v, %v"+
+					"    wanted %v, %v",
+				c.before, c.after, got, err, c.want, errStr)
+		}
+	}
 }
 
 func equal(s1, s2 []string) bool {
