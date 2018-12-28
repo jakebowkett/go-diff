@@ -6,19 +6,23 @@ to config structs in a running program.
 package diff
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
+	"text/template"
 )
 
 /*
-Structs takes two structs of any type and finds the
-differences between them. The fields return value is
-a slice where each string corresponds to a field that
-has changed. Unchanged fields are omitted. Its format
-looks like this and string values will be quoted.
+Structs takes two structs of the same type and finds
+the differences between them. Each string in fields
+corresponds to a field that changed. Unchanged fields
+are omitted. The format of each string looks like this:
 
-	"[field name] changed from [previous value] to [new value]"
+	"{{.Field}} changed from {{.Before}} to {{.After}}"
+
+If the field's value is a string it will be quoted in
+the output. Different formats can be achived with StructsF.
 
 Structs only iterates over the first level of a struct's
 fields. It is not intended for structs whose fields are
@@ -42,15 +46,55 @@ of different types an error will be returned.
 	fmt.Println(fields[0]) // `Debug changed from false to true`
 	fmt.Println(fields[1]) // `Version changed from "" to "0.0.1"`
 	fmt.Println(fields[2]) // `Timeout changed from 0 to 30`
+
 */
 func Structs(before, after interface{}) (fields []string, err error) {
+	return structs("{{.Field}} changed from {{.Before}} to {{.After}}", before, after)
+}
 
-	if err := sameType(before, after); err != nil {
+/*
+StructsF works the same as Structs but takes a format string.
+Formatting is styled after the standard libraries text/template
+package. The available fields to render into the string are .Field,
+.Before, and .After. These respectively refer to the changed
+field's name, its previous value, and its new value. Fields may
+be omitted if desired.
+
+	type Config struct {
+		Debug   bool
+		Version string
+		Timeout int
+	}
+
+	c1 := Config{}
+	c2 := Config{"0.0.1", true, 30}
+
+	fields, _ := diff.StructsF("{{.Name}}: {{.After}}", c1, c2)
+	fmt.Println(fields[0]) // `Debug: true`
+	fmt.Println(fields[1]) // `Version: "0.0.1"`
+	fmt.Println(fields[2]) // `Timeout: 30`
+
+*/
+func StructsF(format string, before, after interface{}) (fields []string, err error) {
+	return structs(format, before, after)
+}
+
+func structs(format string, before, after interface{}) ([]string, error) {
+
+	if err := valid(before, after); err != nil {
+		return nil, err
+	}
+
+	t, err := template.New("field").Parse(format)
+	if err != nil {
 		return nil, err
 	}
 
 	s1 := reflect.ValueOf(before)
 	s2 := reflect.ValueOf(after)
+
+	var fields []string
+	var buf bytes.Buffer
 
 	for i := 0; i < s1.NumField(); i++ {
 
@@ -66,15 +110,24 @@ func Structs(before, after interface{}) (fields []string, err error) {
 			v2 = fmt.Sprintf("%q", v2)
 		}
 
-		fields = append(fields, fmt.Sprintf(
-			"%s changed from %v to %v",
-			reflect.TypeOf(before).Field(i).Name, v1, v2))
+		t.Execute(&buf, struct {
+			Field  string
+			Before interface{}
+			After  interface{}
+		}{
+			Field:  reflect.TypeOf(before).Field(i).Name,
+			Before: v1,
+			After:  v2,
+		})
+
+		fields = append(fields, buf.String())
+		buf.Reset()
 	}
 
 	return fields, nil
 }
 
-func sameType(before, after interface{}) error {
+func valid(before, after interface{}) error {
 
 	s1 := reflect.TypeOf(before)
 	s2 := reflect.TypeOf(after)
