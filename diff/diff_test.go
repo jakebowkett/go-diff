@@ -1,6 +1,9 @@
 package diff
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 type config struct {
 	Debug   bool
@@ -13,7 +16,7 @@ type notConfig struct {
 	Timeout int
 }
 
-func TestStructs(t *testing.T) {
+func TestObjects(t *testing.T) {
 
 	cases := []struct {
 		before  interface{}
@@ -27,7 +30,7 @@ func TestStructs(t *testing.T) {
 			[3]int{1, 2, 3},
 			[3]int{1, 2, 3},
 			nil,
-			true,
+			false,
 		},
 
 		// One non struct.
@@ -75,25 +78,26 @@ func TestStructs(t *testing.T) {
 			config{true, "0.0.0", 30},
 			config{false, "0.0.1", 15},
 			[]string{
-				`Debug changed from true to false`,
-				`Version changed from "0.0.0" to "0.0.1"`,
-				`Timeout changed from 30 to 15`,
+				`.Debug changed from true to false`,
+				`.Version changed from "0.0.0" to "0.0.1"`,
+				`.Timeout changed from 30 to 15`,
 			},
 			false,
 		},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 
 		errStr := "nil"
 		if c.wantErr {
 			errStr = "error"
 		}
 
-		got, err := Structs(c.before, c.after)
+		got, err := Objects(c.before, c.after)
 		if !equal(got, c.want) || err == nil && c.wantErr {
+			fmt.Printf("Case #%d:\n", i+1)
 			t.Errorf(
-				"Structs(%v, %v)\n"+
+				"Objects(%v, %v)\n"+
 					"    return %v, %v"+
 					"    wanted %v, %v",
 				c.before, c.after, got, err, c.want, errStr)
@@ -101,65 +105,66 @@ func TestStructs(t *testing.T) {
 	}
 }
 
-func TestStructsF(t *testing.T) {
+// func TestObjectsF(t *testing.T) {
 
-	cases := []struct {
-		before  interface{}
-		after   interface{}
-		format  string
-		want    []string
-		wantErr bool
-	}{
-		// Unavailable field in format string.
-		{
-			config{true, "0.0.0", 30},
-			config{true, "0.0.1", 15},
-			`{{.Field}}: {{.Apple}}`,
-			nil,
-			true,
-		},
+// 	cases := []struct {
+// 		before  interface{}
+// 		after   interface{}
+// 		format  string
+// 		want    []string
+// 		wantErr bool
+// 	}{
+// 		// Unavailable field in format string.
+// 		{
+// 			config{true, "0.0.0", 30},
+// 			config{true, "0.0.1", 15},
+// 			`{{.Field}}: {{.Apple}}`,
+// 			nil,
+// 			true,
+// 		},
 
-		// Correctly formatted strings.
-		{
-			config{true, "0.0.0", 30},
-			config{true, "0.0.1", 15},
-			`{{.Field}}: {{.After}}`,
-			[]string{
-				`Version: "0.0.1"`,
-				`Timeout: 15`,
-			},
-			false,
-		},
-		{
-			config{true, "0.0.0", 30},
-			config{false, "0.0.1", 0},
-			`{{.Before}} --> {{.After}}`,
-			[]string{
-				`true --> false`,
-				`"0.0.0" --> "0.0.1"`,
-				`30 --> 0`,
-			},
-			false,
-		},
-	}
+// 		// Correctly formatted strings.
+// 		{
+// 			config{true, "0.0.0", 30},
+// 			config{true, "0.0.1", 15},
+// 			`{{.Field}}: {{.After}}`,
+// 			[]string{
+// 				`Version: "0.0.1"`,
+// 				`Timeout: 15`,
+// 			},
+// 			false,
+// 		},
+// 		{
+// 			config{true, "0.0.0", 30},
+// 			config{false, "0.0.1", 0},
+// 			`{{.Before}} --> {{.After}}`,
+// 			[]string{
+// 				`true --> false`,
+// 				`"0.0.0" --> "0.0.1"`,
+// 				`30 --> 0`,
+// 			},
+// 			false,
+// 		},
+// 	}
 
-	for _, c := range cases {
+// 	for i, c := range cases {
 
-		errStr := "nil"
-		if c.wantErr {
-			errStr = "error"
-		}
+// 		errStr := "nil"
+// 		if c.wantErr {
+// 			errStr = "error"
+// 		}
 
-		got, err := StructsF(c.format, c.before, c.after)
-		if !equal(got, c.want) || err == nil && c.wantErr {
-			t.Errorf(
-				"Structs(%v, %v)\n"+
-					"    return %v, %v"+
-					"    wanted %v, %v",
-				c.before, c.after, got, err, c.want, errStr)
-		}
-	}
-}
+// 		got, err := ObjectsF(c.format, c.before, c.after)
+// 		if !equal(got, c.want) || err == nil && c.wantErr {
+// 			fmt.Printf("Case #%d:\n", i+1)
+// 			t.Errorf(
+// 				"ObjectsF(%v, %v)\n"+
+// 					"    return %v, %v"+
+// 					"    wanted %v, %v",
+// 				c.before, c.after, got, err, c.want, errStr)
+// 		}
+// 	}
+// }
 
 func equal(s1, s2 []string) bool {
 
@@ -167,7 +172,7 @@ func equal(s1, s2 []string) bool {
 		return false
 	}
 
-	for i, _ := range s1 {
+	for i := range s1 {
 		if s1[i] != s2[i] {
 			return false
 		}
