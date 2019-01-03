@@ -105,66 +105,78 @@ func TestObjects(t *testing.T) {
 	}
 }
 
-// func TestObjectsF(t *testing.T) {
+func TestObjectsF(t *testing.T) {
 
-// 	cases := []struct {
-// 		before  interface{}
-// 		after   interface{}
-// 		format  string
-// 		want    []string
-// 		wantErr bool
-// 	}{
-// 		// Unavailable field in format string.
-// 		{
-// 			config{true, "0.0.0", 30},
-// 			config{true, "0.0.1", 15},
-// 			`{{.Field}}: {{.Apple}}`,
-// 			nil,
-// 			true,
-// 		},
+	cases := []struct {
+		before  interface{}
+		after   interface{}
+		format  Format
+		want    []string
+		wantErr bool
+	}{
+		// Unavailable field in format string.
+		{
+			config{true, "0.0.0", 30},
+			config{true, "0.0.1", 15},
+			Format{
+				Change: `{{.Name}}: {{.Apple}}`,
+				Add:    `{{.Name}}: {{.Apple}}`,
+				Delete: `{{.Name}}: {{.Apple}}`,
+			},
+			nil,
+			true,
+		},
 
-// 		// Correctly formatted strings.
-// 		{
-// 			config{true, "0.0.0", 30},
-// 			config{true, "0.0.1", 15},
-// 			`{{.Field}}: {{.After}}`,
-// 			[]string{
-// 				`Version: "0.0.1"`,
-// 				`Timeout: 15`,
-// 			},
-// 			false,
-// 		},
-// 		{
-// 			config{true, "0.0.0", 30},
-// 			config{false, "0.0.1", 0},
-// 			`{{.Before}} --> {{.After}}`,
-// 			[]string{
-// 				`true --> false`,
-// 				`"0.0.0" --> "0.0.1"`,
-// 				`30 --> 0`,
-// 			},
-// 			false,
-// 		},
-// 	}
+		// Correctly formatted strings.
+		{
+			config{true, "0.0.0", 30},
+			config{true, "0.0.1", 15},
+			Format{
+				Change: `{{.Name}}: {{.After}}`,
+				Add:    `{{.Name}}: {{.Before}}{{.After}}`,
+				Delete: `{{.Name}}: {{.Before}}`,
+			},
+			[]string{
+				`.Version: "0.0.1"`,
+				`.Timeout: 15`,
+			},
+			false,
+		},
+		{
+			config{true, "0.0.0", 30},
+			config{false, "0.0.1", 0},
+			Format{
+				Change: `{{.Before}} --> {{.After}}`,
+				Add:    `{{.Before}} --> {{.After}}`,
+				Delete: `{{.Before}} --> {{.After}}`,
+			},
+			[]string{
+				`true --> false`,
+				`"0.0.0" --> "0.0.1"`,
+				`30 --> 0`,
+			},
+			false,
+		},
+	}
 
-// 	for i, c := range cases {
+	for i, c := range cases {
 
-// 		errStr := "nil"
-// 		if c.wantErr {
-// 			errStr = "error"
-// 		}
+		errStr := "nil"
+		if c.wantErr {
+			errStr = "error"
+		}
 
-// 		got, err := ObjectsF(c.format, c.before, c.after)
-// 		if !equal(got, c.want) || err == nil && c.wantErr {
-// 			fmt.Printf("Case #%d:\n", i+1)
-// 			t.Errorf(
-// 				"ObjectsF(%v, %v)\n"+
-// 					"    return %v, %v"+
-// 					"    wanted %v, %v",
-// 				c.before, c.after, got, err, c.want, errStr)
-// 		}
-// 	}
-// }
+		got, err := ObjectsF(c.format, c.before, c.after)
+		if !equal(got, c.want) || err == nil && c.wantErr {
+			fmt.Printf("Case #%d:\n", i+1)
+			t.Errorf(
+				"ObjectsF(%v, %v, %v)\n"+
+					"    return %v, %v"+
+					"    wanted %v, %v",
+				c.format, c.before, c.after, got, err, c.want, errStr)
+		}
+	}
+}
 
 func equal(s1, s2 []string) bool {
 
