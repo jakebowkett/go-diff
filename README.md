@@ -10,7 +10,7 @@ godoc link above for documentation.
 type Config struct {
     Debug      bool
     Path       string
-    timeout    int
+    timeout    int // unexported fields will be diffed
     EmailOnErr []string
 }
 
