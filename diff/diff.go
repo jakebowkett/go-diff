@@ -34,8 +34,7 @@ import (
 )
 
 /*
-Empty strings in Format will be substituted with
-their default counterparts below.
+These are the default templates.
 */
 const (
 	DefaultChange = "{{.Name}} changed from {{.Before}} to {{.After}}"
@@ -72,11 +71,11 @@ map entry, or slice/array element that was changed, added, or
 deleted. Both exported and unexported fields in structs are
 diffed.
 
-Both before and after must be data structures (a struct, map,
-slice, or array). They must be of the same kind. Anonymous
-data structures are permitted but if either are named types
-the names must match. Failure to ensure these things will
-cause Objects to return an error.
+The arguments before and after must be data structures (a struct,
+map, slice, or array) and they must be of the same kind. Anonymous
+data structures are permitted but named types must have matching
+names. Failure to ensure these things will cause Objects to return
+an error.
 */
 func Objects(before, after interface{}) (changes []string, err error) {
 	return objects(Format{
