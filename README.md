@@ -8,17 +8,24 @@ godoc link above for documentation.
 
 ```go
 type Config struct {
-    Debug   bool
-    Version string
-    Timeout int
+    Debug      bool
+    Path       string
+    timeout    int
+    EmailOnErr []string
 }
 
 c1 := Config{}
-c2 := Config{"0.0.1", true, 30}
+c2 := Config{
+    true,
+    "path/to/thing",
+    30,
+    []string{"person@domain.me"},
+}
 
 changes, _ := diff.Objects(c1, c2)
 
 fmt.Println(changes[0]) // `.Debug changed from false to true`
-fmt.Println(changes[1]) // `.Version changed from "" to "0.0.1"`
-fmt.Println(changes[2]) // `.Timeout changed from 0 to 30`
+fmt.Println(changes[1]) // `.Path changed from "" to "path/to/thing"`
+fmt.Println(changes[2]) // `.timeout changed from 0 to 30`
+fmt.Println(changes[3]) // `.EmailOnErr[0] added "person@domain.me"`
 ```
