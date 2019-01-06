@@ -30,12 +30,23 @@ import (
 	"reflect"
 	"strings"
 	"text/template"
+	"unsafe"
+)
+
+/*
+Empty strings in Format will be substituted with
+their default counterparts below.
+*/
+const (
+	DefaultChange = "{{.Name}} changed from {{.Before}} to {{.After}}"
+	DefaultAdd    = "{{.Name}} added {{.After}}"
+	DefaultDelete = "{{.Name}} deleted {{.Before}}"
 )
 
 /*
 Format contains strings that will be passed to the
-standard library's text/template package. The only
-available arguments are ".Name", ".Before" and ".After"
+standard library's text/template package along with
+a Diff.
 */
 type Format struct {
 	Change string
@@ -43,27 +54,57 @@ type Format struct {
 	Delete string
 }
 
-const msgChange = "{{.Name}} changed from {{.Before}} to {{.After}}"
-const msgAdd = "{{.Name}} added {{.After}}"
-const msgDelete = "{{.Name}} deleted {{.Before}}"
+/*
+Exposed only for documentation purposes. These are
+the fields that will be available to the templates
+in Format.
+*/
+type Diff struct {
+	Name   string
+	Before interface{}
+	After  interface{}
+}
 
+/*
+Objects returns the difference between before and after
+as a slice where each element corresponds to a struct field,
+map entry, or slice/array element that was changed, added, or
+deleted. Both exported and unexported fields in structs are
+diffed.
+
+Both before and after must be data structures (a struct, map,
+slice, or array). They must be of the same kind. Anonymous
+data structures are permitted but if either are named types
+the names must match. Failure to ensure these things will
+cause Objects to return an error.
+*/
 func Objects(before, after interface{}) (changes []string, err error) {
 	return objects(Format{
-		Change: msgChange,
-		Add:    msgAdd,
-		Delete: msgDelete,
+		Change: DefaultChange,
+		Add:    DefaultAdd,
+		Delete: DefaultDelete,
 	}, before, after)
 }
 
+/*
+ObjectsF works the same as Objects with an additional
+parameter allowing for custom formatting.
+
+Empty strings in format will be substituted with their
+respective defaults.
+
+If a template string in format attempts to render something
+other than a field in the Diff type an error will be returned.
+*/
 func ObjectsF(format Format, before, after interface{}) (changes []string, err error) {
 	if format.Change == "" {
-		format.Change = msgChange
+		format.Change = DefaultChange
 	}
 	if format.Add == "" {
-		format.Add = msgAdd
+		format.Add = DefaultAdd
 	}
 	if format.Delete == "" {
-		format.Delete = msgDelete
+		format.Delete = DefaultDelete
 	}
 	return objects(format, before, after)
 }
@@ -121,6 +162,15 @@ func (d *differ) popPath() {
 	d.path = d.path[0 : len(d.path)-1]
 }
 
+/*
+We use pointers to reflect.Value to distinguish between
+fields/keys/indices that are zero value vs non-existent
+due to an asyemmtry in the two data structures.
+
+A nil reflect.Value pointer means "this field/key/index
+doesn't exist in this data structure." This distinction
+is required by diffAtom below.
+*/
 func (d *differ) diff(v1, v2 *reflect.Value) error {
 
 	var kind string
@@ -143,14 +193,23 @@ func (d *differ) diff(v1, v2 *reflect.Value) error {
 		err = d.diffAtom(v1, v2)
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (d *differ) diffStruct(v1, v2 *reflect.Value) error {
+
+	// Make the structs addressable. This makes it
+	// possible to get unexported fields later.
+	var val1 reflect.Value
+	var val2 reflect.Value
+	if v1 != nil {
+		val1 = reflect.New(v1.Type()).Elem()
+		val1.Set(*v1)
+	}
+	if v2 != nil {
+		val2 = reflect.New(v2.Type()).Elem()
+		val2.Set(*v2)
+	}
 
 	var fields int
 	if v1 == nil {
@@ -162,30 +221,26 @@ func (d *differ) diffStruct(v1, v2 *reflect.Value) error {
 	for i := 0; i < fields; i++ {
 
 		var name string
-		var field1 *reflect.Value
-		var field2 *reflect.Value
+		var f1 *reflect.Value
+		var f2 *reflect.Value
 
 		switch {
 		case v1 == nil:
-			name = reflect.TypeOf(v2.Interface()).Field(i).Name
-			field1 = nil
-			f2 := v2.Field(i)
-			field2 = &f2
+			name = v2.Type().Field(i).Name
+			f1 = nil
+			f2 = field(val2.Field(i))
 		case v2 == nil:
-			name = reflect.TypeOf(v1.Interface()).Field(i).Name
-			f1 := v1.Field(i)
-			field1 = &f1
-			field2 = nil
+			name = v1.Type().Field(i).Name
+			f1 = field(val1.Field(i))
+			f2 = nil
 		default:
-			name = reflect.TypeOf(v1.Interface()).Field(i).Name
-			f1 := v1.Field(i)
-			f2 := v2.Field(i)
-			field1 = &f1
-			field2 = &f2
+			name = v1.Type().Field(i).Name
+			f1 = field(val1.Field(i))
+			f2 = field(val2.Field(i))
 		}
 
 		d.path = append(d.path, "."+name)
-		err := d.diff(field1, field2)
+		err := d.diff(f1, f2)
 		if err != nil {
 			return err
 		}
@@ -193,6 +248,12 @@ func (d *differ) diffStruct(v1, v2 *reflect.Value) error {
 	}
 
 	return nil
+}
+
+// We do this to get at unexported struct fields.
+func field(f reflect.Value) *reflect.Value {
+	f = reflect.NewAt(f.Type(), unsafe.Pointer(f.UnsafeAddr())).Elem()
+	return &f
 }
 
 func (d *differ) diffSequence(v1, v2 *reflect.Value) error {

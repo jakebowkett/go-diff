@@ -33,6 +33,16 @@ func TestObjects(t *testing.T) {
 			false,
 		},
 
+		// Non structs of same type with different contents.
+		{
+			[3]int{1, 2, 3},
+			[3]int{1, 2},
+			[]string{
+				`[2] changed from 3 to 0`,
+			},
+			false,
+		},
+
 		// One non struct.
 		{
 			config{},
