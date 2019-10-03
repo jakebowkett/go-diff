@@ -15,6 +15,9 @@ type notConfig struct {
 	Version string
 	Timeout int
 }
+type arrayTest struct {
+	Mapping map[string][]string
+}
 
 func TestObjects(t *testing.T) {
 
@@ -24,6 +27,31 @@ func TestObjects(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
+
+		// Nil object.
+		{
+			[]string{"hi", "there"},
+			nil,
+			nil,
+			true,
+		},
+
+		// Nested arrays were one is nil.
+		{
+			arrayTest{
+				Mapping: map[string][]string{
+					"yo": []string{"hi", "there"},
+				},
+			},
+			arrayTest{
+				Mapping: map[string][]string{},
+			},
+			[]string{
+				`.Mapping["yo"][0] deleted "hi"`,
+				`.Mapping["yo"][1] deleted "there"`,
+			},
+			false,
+		},
 
 		// Non structs of same type.
 		{

@@ -25,7 +25,6 @@ package diff
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -257,9 +256,18 @@ func field(f reflect.Value) *reflect.Value {
 
 func (d *differ) diffSequence(v1, v2 *reflect.Value) error {
 
-	longest := v1.Len()
-	if v2.Len() > longest {
-		longest = v2.Len()
+	longest := 0
+	v1Len := 0
+	v2Len := 0
+	if v1 != nil {
+		v1Len = v1.Len()
+		longest = v1Len
+	}
+	if v2 != nil {
+		v2Len = v2.Len()
+		if v2.Len() > longest {
+			longest = v2Len
+		}
 	}
 
 	for i := 0; i < longest; i++ {
@@ -268,11 +276,11 @@ func (d *differ) diffSequence(v1, v2 *reflect.Value) error {
 		var elem2 *reflect.Value
 
 		switch {
-		case i > v1.Len()-1:
+		case i > v1Len-1:
 			elem1 = nil
 			e2 := v2.Index(i)
 			elem2 = &e2
-		case i > v2.Len()-1:
+		case i > v2Len-1:
 			e1 := v1.Index(i)
 			elem1 = &e1
 			elem2 = nil
@@ -406,9 +414,9 @@ func formatInterface(i interface{}) interface{} {
 
 func sameNamedType(t1, t2 reflect.Type) error {
 	if t1.Name() != t2.Name() {
-		return errors.New(fmt.Sprintf(
+		return fmt.Errorf(
 			`objects must be same type - "before" was %s, "after" was %s`,
-			t1.Name(), t2.Name()))
+			t1.Name(), t2.Name())
 	}
 	return nil
 }
@@ -417,9 +425,9 @@ func sameKind(t1, t2 reflect.Type) error {
 	kind1 := t1.Kind().String()
 	kind2 := t2.Kind().String()
 	if kind1 != kind2 {
-		return errors.New(fmt.Sprintf(
+		return fmt.Errorf(
 			`objects must be same kind - "before" was %s, "after" was %s`,
-			kind1, kind2))
+			kind1, kind2)
 	}
 	return nil
 }
@@ -428,16 +436,27 @@ var objectKinds = []string{"struct", "array", "slice", "map"}
 
 func isObj(t1, t2 reflect.Type) error {
 
+	if t1 == nil {
+		return fmt.Errorf(
+			`argument "before" was nil, wanted non-nil %s`,
+			quotedList(objectKinds, "or"))
+	}
+	if t2 == nil {
+		return fmt.Errorf(
+			`argument "after" was nil, wanted non-nil %s`,
+			quotedList(objectKinds, "or"))
+	}
+
 	if kind := t1.Kind().String(); !in(objectKinds, kind) {
-		return errors.New(fmt.Sprintf(
+		return fmt.Errorf(
 			`argument "before" was of kind %q, wanted kind %s`,
-			kind, quotedList(objectKinds, "or")))
+			kind, quotedList(objectKinds, "or"))
 	}
 
 	if kind := t2.Kind().String(); !in(objectKinds, kind) {
-		return errors.New(fmt.Sprintf(
+		return fmt.Errorf(
 			`argument "after" was of kind %q, wanted kind %s`,
-			kind, quotedList(objectKinds, "or")))
+			kind, quotedList(objectKinds, "or"))
 	}
 
 	return nil
