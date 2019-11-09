@@ -112,7 +112,10 @@ func objects(format Format, before, after interface{}) (changes []string, err er
 	t1 := reflect.TypeOf(before)
 	t2 := reflect.TypeOf(after)
 
-	if err := isObj(t1, t2); err != nil {
+	if err := isObj(t1, "before"); err != nil {
+		return nil, err
+	}
+	if err := isObj(t2, "after"); err != nil {
 		return nil, err
 	}
 	if err := sameKind(t1, t2); err != nil {
@@ -169,7 +172,7 @@ A nil reflect.Value pointer means "this field/key/index
 doesn't exist in this data structure." This distinction
 is required by diffAtom below.
 */
-func (d *differ) diff(v1, v2 *reflect.Value) error {
+func (d *differ) diff(v1, v2 *reflect.Value) (err error) {
 
 	var kind string
 	if v1 == nil {
@@ -177,8 +180,6 @@ func (d *differ) diff(v1, v2 *reflect.Value) error {
 	} else {
 		kind = v1.Kind().String()
 	}
-
-	var err error
 
 	switch kind {
 	case "struct":
@@ -265,9 +266,9 @@ func (d *differ) diffSequence(v1, v2 *reflect.Value) error {
 	}
 	if v2 != nil {
 		v2Len = v2.Len()
-		if v2.Len() > longest {
-			longest = v2Len
-		}
+	}
+	if v2Len > longest {
+		longest = v2Len
 	}
 
 	for i := 0; i < longest; i++ {
@@ -349,7 +350,12 @@ func alignMapKeys(m1, m2 *reflect.Value) map[interface{}]val {
 	k1 := m1.MapKeys()
 	k2 := m2.MapKeys()
 
-	m := make(map[interface{}]val, len(k1)*(len(k2)/2))
+	longest := len(k1)
+	if len(k2) > longest {
+		longest = len(k2)
+	}
+
+	m := make(map[interface{}]val, longest)
 
 	for _, k := range k1 {
 		m[k.Interface()] = val{before: true}
@@ -434,29 +440,21 @@ func sameKind(t1, t2 reflect.Type) error {
 
 var objectKinds = []string{"struct", "array", "slice", "map"}
 
-func isObj(t1, t2 reflect.Type) error {
+func isObj(t reflect.Type, which string) error {
 
-	if t1 == nil {
+	if t == nil {
 		return fmt.Errorf(
-			`argument "before" was nil, wanted non-nil %s`,
-			quotedList(objectKinds, "or"))
-	}
-	if t2 == nil {
-		return fmt.Errorf(
-			`argument "after" was nil, wanted non-nil %s`,
+			`argument %q was nil, wanted non-nil %s`,
+			which,
 			quotedList(objectKinds, "or"))
 	}
 
-	if kind := t1.Kind().String(); !in(objectKinds, kind) {
+	if kind := t.Kind().String(); !in(objectKinds, kind) {
 		return fmt.Errorf(
-			`argument "before" was of kind %q, wanted kind %s`,
-			kind, quotedList(objectKinds, "or"))
-	}
-
-	if kind := t2.Kind().String(); !in(objectKinds, kind) {
-		return fmt.Errorf(
-			`argument "after" was of kind %q, wanted kind %s`,
-			kind, quotedList(objectKinds, "or"))
+			`argument %q was of kind %q, wanted kind %s`,
+			which,
+			kind,
+			quotedList(objectKinds, "or"))
 	}
 
 	return nil
