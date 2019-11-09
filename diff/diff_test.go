@@ -15,8 +15,11 @@ type notConfig struct {
 	Version string
 	Timeout int
 }
-type arrayTest struct {
+type nestedTest struct {
 	Mapping map[string][]string
+}
+type mapTest struct {
+	Mapping map[string]string
 }
 
 func TestObjects(t *testing.T) {
@@ -36,14 +39,41 @@ func TestObjects(t *testing.T) {
 			true,
 		},
 
-		// Nested arrays were one is nil.
+		// General maps.
 		{
-			arrayTest{
+			map[string]string{
+				"yo": "hello",
+			},
+			map[string]string{
+				"hi": "there",
+			},
+			[]string{
+				`["yo"] deleted "hello"`,
+				`["hi"] added "there"`,
+			},
+			false,
+		},
+
+		// Nested maps where one is nil.
+		{
+			nestedTest{},
+			nestedTest{
+				Mapping: map[string][]string{
+					"yo": []string{"hi"},
+				},
+			},
+			[]string{`.Mapping["yo"][0] added "hi"`},
+			false,
+		},
+
+		// Nested arrays where one is nil.
+		{
+			nestedTest{
 				Mapping: map[string][]string{
 					"yo": []string{"hi", "there"},
 				},
 			},
-			arrayTest{
+			nestedTest{
 				Mapping: map[string][]string{},
 			},
 			[]string{
@@ -136,7 +166,7 @@ func TestObjects(t *testing.T) {
 			fmt.Printf("Case #%d:\n", i+1)
 			t.Errorf(
 				"Objects(%v, %v)\n"+
-					"    return %v, %v"+
+					"    return %v, %v\n"+
 					"    wanted %v, %v",
 				c.before, c.after, got, err, c.want, errStr)
 		}
